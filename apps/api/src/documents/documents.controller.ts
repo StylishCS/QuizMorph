@@ -8,6 +8,7 @@ import {
   Post,
   Body,
   Req,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
@@ -71,6 +72,17 @@ export class DocumentsController {
   async questions(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: JwtUser) {
     this.log.log(`[questions] user=${user.userId} documentId=${id}`);
     return this.documents.getQuestions(id, user.userId);
+  }
+
+  @Get(':id/work-assets/:filename')
+  async workAsset(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('filename') filename: string,
+    @CurrentUser() user: JwtUser,
+  ): Promise<StreamableFile> {
+    const buf = await this.documents.readWorkAsset(id, user.userId, filename);
+    this.log.debug(`[work-assets] documentId=${id} file=${filename} bytes=${buf.length}`);
+    return new StreamableFile(buf, { type: 'image/png' });
   }
 
   @Post(':id/generate-form')

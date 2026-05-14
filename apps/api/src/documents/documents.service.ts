@@ -2,8 +2,9 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import type { ProcessDocumentDto } from './dto/process-document.dto';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { join, resolve, dirname, basename, relative, sep } from 'node:path';
 import { v4 as uuid } from 'uuid';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -125,6 +126,29 @@ export class DocumentsService {
       imageRefs: r.imageRefs as string[],
       metadata: r.metadata as Record<string, unknown>,
     }));
+  }
+
+  /** Page raster PNGs from the worker (`page_XXXX.png`) for preview in the web app. */
+  async readWorkAsset(documentId: string, userId: string, rawFilename: string): Promise<Buffer> {
+    const doc = await this.prisma.document.findFirst({ where: { id: documentId, userId } });
+    if (!doc) throw new NotFoundException('Document not found');
+
+    const safe = basename(rawFilename.replace(/\\/g, '/'));
+    if (!/^page_\d{4}\.png$/i.test(safe)) {
+      throw new BadRequestException('Invalid asset name');
+    }
+
+    const workDir = resolve(join(dirname(doc.storagePath), `${documentId}-work`));
+    const target = resolve(join(workDir, safe));
+    const rel = relative(workDir, target);
+    if (rel.startsWith('..') || rel.split(sep).includes('..')) {
+      throw new BadRequestException('Invalid path');
+    }
+    if (!existsSync(target)) {
+      throw new NotFoundException('Asset not found');
+    }
+
+    return readFile(target);
   }
 
   async generateForm(documentId: string, userId: string, timerEnabled = true) {

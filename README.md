@@ -158,6 +158,9 @@ Google Forms does not provide a full proctored countdown by itself. For a timed 
 |----------|------|
 | `DEFAULT_PAGE_START` / `DEFAULT_PAGE_END` | First and last **1-based** PDF page the worker processes (when you do not pass overrides in the API). |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | Where and which model the worker calls. |
+| `WORKER_LOCK_DURATION_MS` | BullMQ **job lock** duration in ms (default **2_700_000** = 45 min). Raise for very large PDFs so the job is not marked **stalled** while Ollama still runs. |
+| `WORKER_MAX_STALLED_COUNT` | How many times a stalled job can return to **wait** before **failed** (default **5**; BullMQ default 1 is harsh for long LLM jobs). |
+| `WORKER_STALLED_INTERVAL_MS` | How often the worker checks for stalled jobs (default **60_000** ms). |
 | `FILE_STORAGE_PATH` | Where uploaded PDFs are stored on disk (absolute path recommended for predictable behavior). |
 | `PYTHON_EXECUTABLE` | Optional override for the Python binary used for PDF extraction. |
 
@@ -176,6 +179,7 @@ The **worker** loads the same three paths in order at startup (see `apps/worker/
 | **Worker says DATABASE_URL not set** | Restart dev after updating the worker; keep `DATABASE_URL` in the **repo root** `.env` (the worker loads `apps/worker/.env`, then `apps/.env`, then root `.env`). |
 | **`pip` / PyMuPDF errors** | Use `npm run worker:setup-python` and `python3-venv`; do not install PyMuPDF system-wide on PEP 668 distros. |
 | **Ollama errors** | Is Ollama running? Is the model pulled? Does `OLLAMA_MODEL` match? |
+| **BullMQ “job stalled” / duplicate processing** | Long PDF + vision uses one job for many minutes. Defaults are tuned (`WORKER_LOCK_DURATION_MS` 45 min, `WORKER_MAX_STALLED_COUNT` 5). Increase lock duration if needed; avoid pausing the worker process for longer than a stall check. |
 | **“Sign in again” / cannot generate form** | Re-consent Google with **Forms** scope; ensure `google_refresh_token` is populated (sign out of the app and sign in again). |
 | **OAuth redirect mismatch** | `GOOGLE_CALLBACK_URL` must match the Google Cloud **Authorized redirect URIs** exactly. |
 

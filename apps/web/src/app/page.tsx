@@ -11,7 +11,9 @@ function apiBase() {
 async function apiFetch(path: string, init: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
   const headers = new Headers(init.headers);
-  headers.set('Accept', 'application/json');
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json');
+  }
   if (token) headers.set('Authorization', `Bearer ${token}`);
   return fetch(`${apiBase()}${path}`, { ...init, headers });
 }
@@ -85,6 +87,7 @@ export default function HomePage() {
   const [pageEndInput, setPageEndInput] = useState('24');
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
   const questionsLoadedRef = useRef(false);
+  const [figureBlobUrls, setFigureBlobUrls] = useState<string[]>([]);
 
   useEffect(() => {
     setToken(localStorage.getItem(TOKEN_KEY));
@@ -244,6 +247,47 @@ export default function HomePage() {
     () => questions?.find((q) => q.id === selectedQuestionId) ?? null,
     [questions, selectedQuestionId],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    const q = questions?.find((x) => x.id === selectedQuestionId) ?? null;
+
+    if (!docId || !q?.imageRefs?.length) {
+      setFigureBlobUrls((prev) => {
+        prev.forEach(URL.revokeObjectURL);
+        return [];
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const refs = q.imageRefs;
+    const created: string[] = [];
+    void (async () => {
+      for (const name of refs) {
+        if (cancelled) break;
+        const res = await apiFetch(`/documents/${docId}/work-assets/${encodeURIComponent(name)}`, {
+          headers: { Accept: 'image/png,*/*' },
+        });
+        if (cancelled || !res.ok) continue;
+        const u = URL.createObjectURL(await res.blob());
+        created.push(u);
+      }
+      if (cancelled) {
+        created.forEach(URL.revokeObjectURL);
+        return;
+      }
+      setFigureBlobUrls((prev) => {
+        prev.forEach(URL.revokeObjectURL);
+        return created;
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [docId, selectedQuestionId, questions]);
 
   const prog = progressVisual(status);
   const st = status?.status;
@@ -526,6 +570,29 @@ export default function HomePage() {
                   <span className="text-xs text-slate-500">Question {selectedQuestion.order + 1}</span>
                 </div>
                 <p className="whitespace-pre-wrap text-base leading-relaxed text-slate-800">{selectedQuestion.questionText}</p>
+                {figureBlobUrls.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-600">
+                      Page snapshot from the PDF (charts, diagrams, and layout)
+                    </p>
+                    <div className="space-y-3">
+                      {figureBlobUrls.map((src, i) => (
+                        <img
+                          key={`${selectedQuestion.id}-fig-${i}`}
+                          src={src}
+                          alt=""
+                          className="max-h-[min(520px,70vh)] w-full rounded-lg border border-slate-200 bg-white object-contain shadow-inner"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : selectedQuestion.imageRefs && selectedQuestion.imageRefs.length > 0 ? (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50/90 px-3 py-2 text-xs text-amber-900">
+                    This question references figure files ({selectedQuestion.imageRefs.join(', ')}) but they
+                    could not be loaded. They may be missing if the work folder was cleared; try processing
+                    the document again.
+                  </p>
+                ) : null}
                 {selectedQuestion.options?.length ? (
                   <ul className="space-y-2">
                     {selectedQuestion.options.map((opt, i) => (

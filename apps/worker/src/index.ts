@@ -268,10 +268,23 @@ async function handleJob(payload: ProcessDocumentJob, prisma: PrismaClient) {
   });
 }
 
+function parsePositiveIntEnv(raw: string | undefined, fallback: number): number {
+  if (raw == null || raw.trim() === '') return fallback;
+  const n = Number.parseInt(raw.trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
 async function main() {
   const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
   const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
   const prisma = new PrismaClient();
+
+  const lockDuration = parsePositiveIntEnv(process.env.WORKER_LOCK_DURATION_MS, 45 * 60 * 1000);
+  const maxStalledCount = Math.min(
+    50,
+    Math.max(1, parsePositiveIntEnv(process.env.WORKER_MAX_STALLED_COUNT, 5)),
+  );
+  const stalledInterval = parsePositiveIntEnv(process.env.WORKER_STALLED_INTERVAL_MS, 60 * 1000);
 
   new Worker(
     'documents',
@@ -292,12 +305,25 @@ async function main() {
         throw err;
       }
     },
-    { connection },
-  ).on('failed', (job, err) => {
-    console.error('Job failed', job?.id, err);
-  });
+    {
+      connection,
+      lockDuration,
+      maxStalledCount,
+      stalledInterval,
+    },
+  )
+    .on('stalled', (jobId) => {
+      console.warn(
+        `[worker] job stalled (lock expired or worker too busy; BullMQ may requeue): id=${String(jobId)}`,
+      );
+    })
+    .on('failed', (job, err) => {
+      console.error('Job failed', job?.id, err);
+    });
 
-  console.log('Worker listening on queue documents');
+  console.log(
+    `Worker listening on queue documents (lockDuration=${lockDuration}ms maxStalledCount=${maxStalledCount} stalledInterval=${stalledInterval}ms)`,
+  );
 }
 
 main().catch((e) => {
