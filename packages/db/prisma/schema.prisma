@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DocumentStatus {
+  uploaded
+  processing
+  ready
+  failed
+}
+
+model User {
+  id                   String    @id @default(uuid())
+  email                String    @unique
+  googleId             String    @unique @map("google_id")
+  googleRefreshToken   String?   @map("google_refresh_token") @db.Text
+  role                 String    @default("user")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  documents            Document[]
+}
+
+model Document {
+  id            String     @id @default(uuid())
+  userId        String     @map("user_id")
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originalName  String     @map("original_name")
+  status        DocumentStatus @default(uploaded)
+  pageCount     Int        @default(0) @map("page_count")
+  storagePath   String     @map("storage_path")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  pages         DocumentPage[]
+  questions     ExtractedQuestion[]
+  forms         GeneratedForm[]
+}
+
+model DocumentPage {
+  id         String   @id @default(uuid())
+  documentId String   @map("document_id")
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  pageNumber Int      @map("page_number")
+  imagePath  String?  @map("image_path")
+  ocrText    String?  @map("ocr_text") @db.Text
+
+  @@unique([documentId, pageNumber])
+}
+
+model ExtractedQuestion {
+  id            String   @id @default(uuid())
+  documentId    String   @map("document_id")
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  order         Int
+  questionText  String   @map("question_text") @db.Text
+  questionType  String   @map("question_type")
+  options       Json     @default("[]")
+  answerKey     String?  @map("answer_key") @db.Text
+  imageRefs     Json     @default("[]") @map("image_refs")
+  metadata      Json     @default("{}")
+}
+
+model GeneratedForm {
+  id            String   @id @default(uuid())
+  documentId    String   @map("document_id")
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  googleFormId  String?  @map("google_form_id")
+  formUrl       String?  @map("form_url")
+  editUrl       String?  @map("edit_url")
+  timerEnabled  Boolean  @default(false) @map("timer_enabled")
+  createdAt     DateTime @default(now()) @map("created_at")
+}

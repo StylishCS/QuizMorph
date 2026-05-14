@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply min-h-screen text-slate-900 antialiased;
+}
+
+@keyframes quizmorph-progress-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
+.quizmorph-progress-indeterminate {
+  animation: quizmorph-progress-slide 1.85s ease-in-out infinite;
+}

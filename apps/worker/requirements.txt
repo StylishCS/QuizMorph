@@ -1,0 +1,5 @@
+# PEP 668 (Debian/Ubuntu): do not `pip install` system-wide. Use a venv:
+#   npm run worker:setup-python
+# If venv creation fails: sudo apt install python3-venv   (or python3.12-venv on some releases)
+# Or: cd apps/worker && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+pymupdf>=1.24.0

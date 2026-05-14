@@ -1,0 +1,28 @@
+{
+  "name": "quizmorph",
+  "private": true,
+  "packageManager": "npm@10.9.7",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
+    "db:generate": "npm exec -w @quizmorph/db -- prisma generate",
+    "db:migrate": "dotenv -e ./.env -- npm exec -w @quizmorph/db -- prisma migrate dev",
+    "db:push": "dotenv -e ./.env -- npm exec -w @quizmorph/db -- prisma db push",
+    "worker:setup-python": "npm run setup:python -w @quizmorph/worker"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^8.0.0",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
